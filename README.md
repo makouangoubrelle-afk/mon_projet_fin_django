@@ -64,6 +64,39 @@ npm run dev
 
 L'application est disponible sur : **http://localhost:5173**
 
+## 3. Mobile patient (Flutter)
+
+L'app mobile **Flutter** est dans le dossier **`sih_mobile/`**. Django la sert sur **`/mobile/`** (pas sur le port 5173).
+
+### Prérequis
+
+- [Flutter SDK](https://docs.flutter.dev/get-started/install/windows) installé (`flutter --version`)
+
+### Démarrage
+
+```powershell
+cd C:\Users\makou\mon_projet_fin_django
+.\demarrer_mobile.ps1
+```
+
+Ou :
+
+```powershell
+.\build_mobile.ps1
+python manage.py runserver 8001
+```
+
+Ouvrez : **http://127.0.0.1:8001/mobile/**  
+Connexion test : **patient@gmail.com** + code OTP.
+
+| Interface | Dossier | URL |
+|-----------|---------|-----|
+| Web personnel (Vue) | `sih-frontend/` | http://localhost:5173 |
+| Mobile patient (Flutter) | `sih_mobile/` → `mobile_dist/` | http://127.0.0.1:8001/mobile/ |
+| En ligne (Render) | — | https://mon-projet-fin-django.onrender.com/mobile/ |
+
+Voir aussi : [sih_mobile/README.md](sih_mobile/README.md)
+
 ## Connexion par email (code à usage unique)
 
 1. Entrez votre **adresse email** sur la page de connexion

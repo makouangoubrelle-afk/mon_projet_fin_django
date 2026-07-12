@@ -189,6 +189,11 @@
             </button>
           </div>
         </form>
+
+        <p class="mt-6 text-center text-xs text-slate-500">
+          Espace patient mobile (Flutter) :
+          <a href="/mobile/" class="text-teal-400 hover:underline">/mobile/</a>
+        </p>
       </div>
     </div>
   </div>
