@@ -146,27 +146,35 @@
           <div v-if="debugCode && !deliveryLive" class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-center">
             <p class="text-amber-200 text-xs uppercase tracking-wider mb-1">Votre code de connexion</p>
             <p class="text-3xl font-bold text-white tracking-[0.3em] select-all">{{ debugCode }}</p>
-            <p class="text-amber-200/80 text-xs mt-2">Le code est déjà rempli ci-dessous. Cliquez sur « Valider et accéder ».</p>
+            <button type="button" class="text-amber-200/90 text-xs underline mt-2" @click="fillFromDebugCode">
+              Remplir automatiquement
+            </button>
           </div>
 
           <div>
-            <label class="block text-xs text-slate-400 mb-2 uppercase tracking-wider text-center">Code à 6 chiffres</label>
-            <input
-              ref="otpSingleRef"
-              v-model="otpCode"
-              type="tel"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              maxlength="6"
-              autocomplete="one-time-code"
-              placeholder="000000"
-              class="w-full px-4 py-4 rounded-xl bg-slate-800 border-2 border-slate-600 text-white text-center text-3xl font-bold tracking-[0.35em] focus:border-teal-500 focus:outline-none"
-              @input="onOtpSingleInput"
-              @keydown.enter.prevent="verifyCode"
-            />
+            <label class="block text-xs text-slate-400 mb-3 uppercase tracking-wider text-center">Saisissez votre code à 6 chiffres</label>
+            <div class="flex justify-center gap-2 sm:gap-3">
+              <input
+                v-for="(_, i) in otpDigits"
+                :key="`otp-${i}`"
+                :ref="el => setOtpRef(el, i)"
+                v-model="otpDigits[i]"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                autocomplete="one-time-code"
+                maxlength="1"
+                class="otp-digit-input"
+                :aria-label="`Chiffre ${i + 1}`"
+                @input="onDigitInput(i, $event)"
+                @keydown="onDigitKeydown(i, $event)"
+                @paste="onOtpPaste"
+              />
+            </div>
+            <p class="text-center text-xs text-slate-500 mt-3">Tapez chaque chiffre ou collez le code reçu</p>
           </div>
 
-          <button type="submit" :disabled="loading || verifying || otpCode.replace(/\D/g,'').length !== 6"
+          <button type="submit" :disabled="loading || verifying || otpCode.length !== 6"
             class="w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold disabled:opacity-50">
             {{ loading ? 'Vérification...' : 'Valider et accéder' }}
           </button>
@@ -219,7 +227,8 @@ const otpMinutes = computed(() => authConfig.value.otp_validity_minutes || 5)
 const lookupInfo = ref({ found: false })
 const lookupLoading = ref(false)
 const otpCode = ref('')
-const otpSingleRef = ref(null)
+const otpDigits = ref(['', '', '', '', '', ''])
+const otpRefs = ref([])
 const roleLabel = ref('')
 const debugCode = ref('')
 const loading = ref(false)
@@ -254,18 +263,65 @@ function workflowStepClass(stepNum) {
   return 'bg-slate-800 border-slate-600 text-slate-400'
 }
 
-function resetOtpDigits() {
-  otpCode.value = ''
+function setOtpRef(el, index) {
+  if (el) otpRefs.value[index] = el
 }
 
-function onOtpSingleInput() {
-  otpCode.value = (otpCode.value || '').replace(/\D/g, '').slice(0, 6)
+function syncCodeFromDigits() {
+  otpCode.value = otpDigits.value.join('')
+}
+
+function resetOtpDigits() {
+  otpCode.value = ''
+  otpDigits.value = ['', '', '', '', '', '']
+  otpRefs.value = []
+}
+
+function onDigitInput(index, event) {
+  const digit = (event.target.value || '').replace(/\D/g, '').slice(-1)
+  otpDigits.value[index] = digit
+  event.target.value = digit
+  syncCodeFromDigits()
   error.value = ''
+  if (digit && index < 5) {
+    otpRefs.value[index + 1]?.focus()
+  }
+}
+
+function onDigitKeydown(index, event) {
+  if (event.key === 'Backspace' && !otpDigits.value[index] && index > 0) {
+    otpRefs.value[index - 1]?.focus()
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    verifyCode()
+  }
+}
+
+function onOtpPaste(event) {
+  event.preventDefault()
+  const pasted = (event.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6)
+  if (!pasted) return
+  pasted.split('').forEach((digit, index) => {
+    otpDigits.value[index] = digit
+  })
+  syncCodeFromDigits()
+  otpRefs.value[Math.min(pasted.length, 5)]?.focus()
+}
+
+function fillFromDebugCode() {
+  const code = (debugCode.value || '').replace(/\D/g, '').slice(0, 6)
+  if (!code) return
+  code.split('').forEach((digit, index) => {
+    otpDigits.value[index] = digit
+  })
+  syncCodeFromDigits()
+  focusOtpInput()
 }
 
 async function focusOtpInput() {
   await nextTick()
-  otpSingleRef.value?.focus()
+  otpRefs.value[0]?.focus()
 }
 
 watch(email, (val) => {
@@ -396,9 +452,6 @@ async function sendCode() {
       info.value = res.delivery_live
         ? (res.detail || 'Code envoyé ! Consultez votre boîte mail.')
         : (res.debug_code ? '' : (res.detail || 'Code généré.'))
-      if (debugCode.value) {
-        otpCode.value = debugCode.value
-      }
       startCooldown(60)
       focusOtpInput()
     } else {
