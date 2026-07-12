@@ -17,10 +17,22 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from django.views.generic import RedirectView
+from django.http import HttpResponse
 from api import api
 
+
+def index(request):
+    html = (
+        "<html><head><title>SGHL</title></head>"
+        "<body><h1>SGHL Backend</h1>"
+        "<p>API is available at <a href='/api/'>/api/</a></p>"
+        "</body></html>"
+    )
+    return HttpResponse(html)
+
+
 urlpatterns = [
-    path('', RedirectView.as_view(url='/api/', permanent=False)),
+    path('', index, name='index'),
     path('admin/', admin.site.urls),
     path('api/', api.urls),
 ]
