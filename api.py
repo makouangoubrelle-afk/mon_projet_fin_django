@@ -774,7 +774,7 @@ def send_login_code(request, data: SendCodeSchema):
                     '' if delivery_live else ' (mode développement — voir code à l\'écran).'
                 )
             )
-    if settings.DEBUG and not delivery_live:
+    if not delivery_live:
         response['debug_code'] = code
     return response
 
