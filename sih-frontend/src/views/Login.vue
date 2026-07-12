@@ -174,7 +174,7 @@
             </div>
           </div>
 
-          <button type="submit" :disabled="loading || otpCode.replace(/\s/g,'').length !== 6"
+          <button type="submit" :disabled="loading || verifying || otpCode.replace(/\D/g,'').length !== 6"
             class="w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold disabled:opacity-50">
             {{ loading ? 'Vérification...' : 'Valider et accéder' }}
           </button>
@@ -237,6 +237,7 @@ const info = ref('')
 const serverDown = ref(false)
 const serverChecking = ref(false)
 const resendCooldown = ref(0)
+const verifying = ref(false)
 let cooldownTimer = null
 let lookupTimer = null
 
@@ -275,9 +276,7 @@ function resetOtpDigits() {
 function onOtpSingleInput() {
   otpCode.value = (otpCode.value || '').replace(/\D/g, '').slice(0, 6)
   syncDigitsFromCode()
-  if (otpCode.value.length === 6 && !loading.value) {
-    verifyCode()
-  }
+  error.value = ''
 }
 
 async function focusOtpInput() {
@@ -431,13 +430,21 @@ async function sendCode() {
 }
 
 async function verifyCode() {
+  if (verifying.value) return
+  const code = otpCode.value.trim().replace(/\D/g, '')
+  if (code.length !== 6) {
+    error.value = 'Entrez les 6 chiffres du code.'
+    return
+  }
+
+  verifying.value = true
   loading.value = true
   error.value = ''
   normaliserEmail()
   try {
     const res = await authService.verifyCode(
       email.value.trim().toLowerCase(),
-      otpCode.value.trim().replace(/\s/g, ''),
+      code,
       selectedRole.value,
     )
     if (isAuthSuccess(res)) {
@@ -450,6 +457,7 @@ async function verifyCode() {
     error.value = e.message
   } finally {
     loading.value = false
+    verifying.value = false
   }
 }
 </script>

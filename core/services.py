@@ -6,16 +6,18 @@ from django.utils import timezone as django_timezone
 def _client_ip(request) -> str | None:
     if not request:
         return None
-    forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+    meta = getattr(request, 'META', None) or {}
+    forwarded = meta.get('HTTP_X_FORWARDED_FOR')
     if forwarded:
         return forwarded.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
+    return meta.get('REMOTE_ADDR')
 
 
 def _client_agent(request) -> str:
     if not request:
         return ''
-    return (request.META.get('HTTP_USER_AGENT') or '')[:500]
+    meta = getattr(request, 'META', None) or {}
+    return (meta.get('HTTP_USER_AGENT') or '')[:500]
 
 
 def record_login(user, request, success: bool = True) -> None:

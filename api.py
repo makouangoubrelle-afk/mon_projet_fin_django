@@ -323,27 +323,56 @@ def _normalize_otp_code(code: str) -> str:
     return ''.join(c for c in (code or '') if c.isdigit())
 
 
-def _find_valid_otp(email: str, code: str):
+def _otp_email_candidates(raw_email: str, role: str = '') -> list:
+    """Emails possibles pour retrouver un OTP (identifiant saisi + compte lié)."""
+    seen = set()
+    candidates = []
+
+    def add(value: str):
+        normalized = _normalize_email(value or '')
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            candidates.append(normalized)
+
+    add(raw_email)
+    user_hint, otp_email, _ = _resolve_login_user(raw_email, role=role)
+    add(otp_email)
+    if user_hint and user_hint.email:
+        add(user_hint.email)
+    return candidates
+
+
+def _find_valid_otp(email: str, code: str, role: str = ''):
     from users.models import OtpCode
-    otp = (
-        OtpCode.objects.filter(
-            email__iexact=email,
-            code=code,
-            is_used=False,
-            expires_at__gt=timezone.now(),
-        )
-        .order_by('-created_at')
-        .first()
-    )
+    from users.otp_services import email_is_live
+
+    code = _normalize_otp_code(code)
+    if len(code) != 6:
+        return None
+
+    now = timezone.now()
+    emails = _otp_email_candidates(email, role)
+
+    def _query(*, ignore_expiry: bool = False):
+        for candidate in emails:
+            qs = OtpCode.objects.filter(email__iexact=candidate, code=code, is_used=False)
+            if not ignore_expiry:
+                qs = qs.filter(expires_at__gt=now)
+            otp = qs.order_by('-created_at').first()
+            if otp:
+                return otp
+        return None
+
+    otp = _query(ignore_expiry=False)
     if otp:
         return otp
-    # Mode souple : code existant non utilisé (même expiré en développement)
-    if settings.DEBUG:
-        return (
-            OtpCode.objects.filter(email__iexact=email, code=code, is_used=False)
-            .order_by('-created_at')
-            .first()
-        )
+
+    # Mode démo (Render sans Gmail) ou développement : accepter le dernier code non utilisé
+    if settings.DEBUG or not email_is_live():
+        otp = _query(ignore_expiry=True)
+        if otp:
+            return otp
+
     return None
 
 
@@ -780,47 +809,53 @@ def send_login_code(request, data: SendCodeSchema):
 
 
 @api.post("/auth/verify-code", tags=["Authentification"])
+@transaction.atomic
 def verify_login_code(request, data: VerifyCodeSchema):
-    from users.models import User
+    from users.models import User, OtpCode
 
     email = _normalize_email(data.email)
     code = _normalize_otp_code(data.code)
+    role = (data.role or '').upper()
 
     if len(code) != 6:
         return {"success": False, "detail": "Le code doit contenir exactement 6 chiffres."}
 
-    otp = _find_valid_otp(email, code)
-
-    if not otp:
-        user_hint, otp_email, _ = _resolve_login_user(data.email, role=data.role or '')
-        if otp_email and otp_email != email:
-            otp = _find_valid_otp(otp_email, code)
-            if otp:
-                email = otp_email
-
-    if not otp and user_hint:
-        otp = _find_valid_otp(user_hint.email, code)
-        if otp:
-            email = user_hint.email
-
+    otp = _find_valid_otp(email, code, role=role)
     if not otp:
         return {
             'success': False,
             'detail': 'Code incorrect ou déjà utilisé. Demandez un nouveau code.',
         }
 
-    otp.is_used = True
-    otp.save(update_fields=['is_used'])
+    # Verrouillage : évite la double validation si deux clics simultanés
+    otp = OtpCode.objects.select_for_update().filter(pk=otp.pk, is_used=False).first()
+    if not otp:
+        return {
+            'success': False,
+            'detail': 'Code déjà utilisé. Demandez un nouveau code.',
+        }
 
-    user = _ensure_user_for_login(email, data.role or '')
+    login_email = otp.email
+    user = _ensure_user_for_login(login_email, role or '')
     if not user:
-        user = _ensure_user_for_login(data.email, data.role or '')
+        user = _ensure_user_for_login(data.email, role or '')
+    if not user:
+        return {
+            'success': False,
+            'detail': 'Impossible de créer le compte. Réessayez ou contactez l\'administrateur.',
+        }
 
     _link_phone_after_login(user, data.phone or (otp.phone if otp else ''))
 
-    from core.services import record_login, log_activity
-    record_login(user, request, success=True)
-    log_activity(request, 'Connexion réussie', 'Authentification', user.email, user=user)
+    try:
+        from core.services import record_login, log_activity
+        record_login(user, request, success=True)
+        log_activity(request, 'Connexion réussie', 'Authentification', user.email, user=user)
+    except Exception:
+        pass
+
+    otp.is_used = True
+    otp.save(update_fields=['is_used'])
 
     return _user_auth_payload(user)
 
