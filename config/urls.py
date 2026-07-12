@@ -31,8 +31,13 @@ def index(request):
     return HttpResponse(html)
 
 
+def healthz(request):
+    return HttpResponse('ok')
+
+
 urlpatterns = [
     path('', index, name='index'),
     path('admin/', admin.site.urls),
+    path('healthz', healthz),
     path('api/', api.urls),
 ]
