@@ -6,7 +6,7 @@
           <h1 class="text-3xl font-bold text-white">👤 Utilisateurs & OTP</h1>
           <p class="text-slate-400 text-sm mt-2">Gérez les comptes, changez l'administrateur, configurez l'envoi du code sur le téléphone ou par email.</p>
         </div>
-        <button type="button" class="btn-save rounded-lg px-6 py-3 text-sm font-semibold" @click="showForm = true">
+        <button type="button" class="btn-save rounded-lg px-6 py-3 text-sm font-semibold" @click="openCreateForm">
           ➕ Nouvel utilisateur
         </button>
       </div>
@@ -25,6 +25,14 @@
       <p class="text-slate-500 text-xs mt-3">
         Pour changer d'admin : modifiez un utilisateur ci-dessous puis cliquez « Définir comme admin principal ».
       </p>
+      <button
+        v-if="primaryAdminUser"
+        type="button"
+        class="mt-4 text-sm px-4 py-2 rounded-lg bg-amber-500/20 text-amber-200 border border-amber-500/30 hover:bg-amber-500/30"
+        @click="openEdit(primaryAdminUser)"
+      >
+        ✏️ Modifier téléphone / OTP de cet admin
+      </button>
     </div>
 
     <div class="page-card p-4 rounded-xl border border-white/10">
@@ -88,66 +96,81 @@
     </div>
 
     <!-- Création -->
-    <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="showForm = false">
-      <form class="page-card p-8 w-full max-w-md space-y-4 rounded-2xl border border-white/10" @submit.prevent="create">
+    <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="closeCreateForm">
+      <form class="page-card p-8 w-full max-w-md space-y-4 rounded-2xl border border-white/10 max-h-[90vh] overflow-y-auto" @submit.prevent="create">
         <h3 class="text-white font-bold text-xl">➕ Nouvel utilisateur</h3>
+        <p class="text-slate-500 text-xs">Pour mettre à jour un compte existant, fermez cette fenêtre et cliquez ✏️ Modifier dans le tableau.</p>
+        <div v-if="formError" class="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm space-y-2">
+          <p>{{ formError }}</p>
+          <button
+            v-if="duplicateUser"
+            type="button"
+            class="text-amber-300 underline text-xs"
+            @click="openEditFromDuplicate"
+          >
+            Ouvrir la modification de {{ duplicateUser.email }}
+          </button>
+        </div>
+        <div v-if="successMessage" class="p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-300 text-sm">{{ successMessage }}</div>
         <div>
           <label class="block text-white text-sm mb-1">Email *</label>
-          <input v-model="form.email" type="email" required class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white" />
+          <input v-model="form.email" type="email" required autocomplete="off" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0" />
         </div>
         <div>
           <label class="block text-white text-sm mb-1">Rôle *</label>
-          <select v-model="form.role" required class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+          <select v-model="form.role" required class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0">
             <option v-for="r in staffRoles" :key="r.code" :value="r.code">{{ r.label }}</option>
           </select>
         </div>
         <div>
           <label class="block text-white text-sm mb-1">Téléphone (pour OTP SMS)</label>
-          <input v-model="form.telephone" placeholder="+242 06 123 4567" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white" />
+          <input v-model="form.telephone" placeholder="+242 06 123 4567" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0" />
         </div>
         <div>
           <label class="block text-white text-sm mb-1">Réception du code OTP</label>
-          <select v-model="form.otp_channel" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+          <select v-model="form.otp_channel" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0">
             <option value="EMAIL">📧 Par email</option>
             <option value="SMS">📱 Par SMS (téléphone)</option>
           </select>
         </div>
         <div class="flex gap-3 justify-end pt-2">
-          <button type="button" class="px-4 py-2 text-slate-400" @click="showForm = false">Annuler</button>
-          <button type="submit" class="btn-save px-4 py-2 rounded-lg" :disabled="saving">{{ saving ? '…' : 'Créer' }}</button>
+          <button type="button" class="px-4 py-2 text-slate-400 hover:text-white" @click="closeCreateForm">Annuler</button>
+          <button type="submit" class="btn-save px-4 py-2 rounded-lg disabled:opacity-50" :disabled="saving">{{ saving ? 'Création…' : 'Créer' }}</button>
         </div>
       </form>
     </div>
 
     <!-- Édition -->
     <div v-if="editUser" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="editUser = null">
-      <form class="page-card p-8 w-full max-w-md space-y-4 rounded-2xl border border-white/10" @submit.prevent="saveEdit">
+      <form class="page-card p-8 w-full max-w-md space-y-4 rounded-2xl border border-white/10 max-h-[90vh] overflow-y-auto" @submit.prevent="saveEdit">
         <h3 class="text-white font-bold text-xl">✏️ Modifier — OTP & connexion</h3>
         <p class="text-slate-400 text-xs">L'utilisateur entre son email à la connexion ; le code part automatiquement au canal choisi.</p>
+        <div v-if="editFormError" class="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">{{ editFormError }}</div>
+        <div v-if="successMessage" class="p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-300 text-sm">{{ successMessage }}</div>
         <div>
           <label class="block text-white text-sm mb-1">Email</label>
-          <input v-model="editForm.email" type="email" required class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white" />
+          <input v-model="editForm.email" type="email" required class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0" />
         </div>
         <div>
           <label class="block text-white text-sm mb-1">Téléphone</label>
-          <input v-model="editForm.telephone" type="tel" placeholder="+242 06 900 10 01" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white" />
+          <input v-model="editForm.telephone" type="tel" placeholder="+242 06 900 10 01" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0" />
         </div>
         <div>
           <label class="block text-white text-sm mb-1">Code OTP reçu sur</label>
-          <select v-model="editForm.otp_channel" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+          <select v-model="editForm.otp_channel" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0">
             <option value="EMAIL">📧 Email (boîte mail sur téléphone)</option>
             <option value="SMS">📱 SMS (numéro ci-dessus)</option>
           </select>
         </div>
         <div>
           <label class="block text-white text-sm mb-1">Rôle</label>
-          <select v-model="editForm.role" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+          <select v-model="editForm.role" class="modal-input w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white mb-0">
             <option v-for="r in staffRoles" :key="r.code" :value="r.code">{{ r.label }}</option>
           </select>
         </div>
         <div class="flex gap-3 justify-end pt-2">
-          <button type="button" class="px-4 py-2 text-slate-400" @click="editUser = null">Annuler</button>
-          <button type="submit" class="btn-save px-4 py-2 rounded-lg" :disabled="saving">{{ saving ? '…' : 'Enregistrer' }}</button>
+          <button type="button" class="px-4 py-2 text-slate-400 hover:text-white" @click="editUser = null">Annuler</button>
+          <button type="submit" class="btn-save px-4 py-2 rounded-lg disabled:opacity-50" :disabled="saving">{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
         </div>
       </form>
     </div>
@@ -155,13 +178,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { coreService } from '../services/api.js'
 
 const users = ref([])
 const adminConfig = ref({ admin_email: '', admin_user_id: null })
 const loading = ref(true)
 const error = ref('')
+const formError = ref('')
+const editFormError = ref('')
+const successMessage = ref('')
+const duplicateUser = ref(null)
 const filterRole = ref('')
 const showForm = ref(false)
 const editUser = ref(null)
@@ -170,6 +197,46 @@ const saving = ref(false)
 const staffRoles = ref([])
 const roleCodes = ref([])
 const form = ref({ email: '', role: 'MEDECIN', telephone: '', otp_channel: 'EMAIL' })
+
+const primaryAdminUser = computed(() => {
+  const email = (adminConfig.value.admin_email || '').trim().toLowerCase()
+  if (email) {
+    const byEmail = users.value.find((u) => u.email.toLowerCase() === email)
+    if (byEmail) return byEmail
+  }
+  return users.value.find((u) => u.is_primary_admin) || null
+})
+
+function emptyForm() {
+  return { email: '', role: 'MEDECIN', telephone: '', otp_channel: 'EMAIL' }
+}
+
+function openCreateForm() {
+  form.value = emptyForm()
+  formError.value = ''
+  duplicateUser.value = null
+  successMessage.value = ''
+  showForm.value = true
+}
+
+function closeCreateForm() {
+  showForm.value = false
+  formError.value = ''
+  duplicateUser.value = null
+}
+
+function findDuplicateEmail(email) {
+  const normalized = (email || '').trim().toLowerCase()
+  if (!normalized) return null
+  return users.value.find((u) => u.email.toLowerCase() === normalized) || null
+}
+
+function openEditFromDuplicate() {
+  if (!duplicateUser.value) return
+  const u = duplicateUser.value
+  closeCreateForm()
+  openEdit(u)
+}
 
 function roleLabel(code) {
   return staffRoles.value.find((r) => r.code === code)?.label || code
@@ -194,15 +261,43 @@ async function load() {
 }
 
 async function create() {
+  formError.value = ''
+  duplicateUser.value = null
+  successMessage.value = ''
+
+  const email = form.value.email.trim().toLowerCase()
+  if (!email) {
+    formError.value = 'Indiquez une adresse email.'
+    return
+  }
+
+  const existing = findDuplicateEmail(email)
+  if (existing) {
+    duplicateUser.value = existing
+    formError.value = `Cet email est déjà utilisé par ${existing.email} (${existing.role_label}). Utilisez « Modifier » au lieu de créer un doublon.`
+    return
+  }
+
   saving.value = true
   try {
-    await coreService.createUser(form.value)
-    showForm.value = false
-    form.value = { email: '', role: 'MEDECIN', telephone: '', otp_channel: 'EMAIL' }
+    await coreService.createUser({
+      email,
+      role: form.value.role,
+      telephone: form.value.telephone.trim(),
+      otp_channel: form.value.otp_channel,
+    })
+    successMessage.value = `Utilisateur ${email} créé avec succès.`
+    form.value = emptyForm()
     await load()
     await loadAdminConfig()
+    setTimeout(() => {
+      closeCreateForm()
+      successMessage.value = ''
+    }, 1200)
   } catch (e) {
-    error.value = e.message
+    formError.value = e.message || 'Impossible de créer l\'utilisateur.'
+    const dup = findDuplicateEmail(email)
+    if (dup) duplicateUser.value = dup
   } finally {
     saving.value = false
   }
@@ -219,6 +314,8 @@ async function toggleActive(u) {
 
 function openEdit(u) {
   editUser.value = u
+  editFormError.value = ''
+  successMessage.value = ''
   editForm.value = {
     email: u.email,
     telephone: u.telephone || '',
@@ -229,19 +326,35 @@ function openEdit(u) {
 
 async function saveEdit() {
   if (!editUser.value) return
+  editFormError.value = ''
+  successMessage.value = ''
+
+  const email = editForm.value.email.trim().toLowerCase()
+  const conflict = users.value.find(
+    (u) => u.id !== editUser.value.id && u.email.toLowerCase() === email
+  )
+  if (conflict) {
+    editFormError.value = `Cet email est déjà utilisé par ${conflict.email}.`
+    return
+  }
+
   saving.value = true
   try {
     await coreService.updateUser(editUser.value.id, {
-      email: editForm.value.email.trim().toLowerCase(),
+      email,
       telephone: editForm.value.telephone.trim(),
       role: editForm.value.role,
       otp_channel: editForm.value.otp_channel,
     })
-    editUser.value = null
+    successMessage.value = 'Modifications enregistrées.'
     await load()
     await loadAdminConfig()
+    setTimeout(() => {
+      editUser.value = null
+      successMessage.value = ''
+    }, 1200)
   } catch (e) {
-    error.value = e.message
+    editFormError.value = e.message || 'Impossible d\'enregistrer.'
   } finally {
     saving.value = false
   }

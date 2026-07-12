@@ -13,8 +13,6 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
-import dj_database_url
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Charger .env si présent
@@ -31,17 +29,21 @@ if _env_file.exists():
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-+qmgi*35ynb6q9-us=u0vii8+l^jn*+xyd+8-#@vc9a$+@m=gz')
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-+qmgi*35ynb6q9-us=u0vii8+l^jn*+xyd+8-#@vc9a$+@m=gz',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() in ('1', 'true', 'yes')
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('1', 'true', 'yes')
 
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]').split(',') if host.strip()]
-RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
-if RENDER_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    CSRF_TRUSTED_ORIGINS = [f'https://{RENDER_EXTERNAL_HOSTNAME}']
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if h.strip()
+]
+
+FRONTEND_DIR = BASE_DIR / 'frontend_dist'
 
 
 # Application definition
@@ -105,10 +107,16 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Fallback SQLite local : USE_SQLITE=true dans .env
 
 _use_sqlite = os.environ.get('USE_SQLITE', '').lower() in ('1', 'true', 'yes')
+_database_url = os.environ.get('DATABASE_URL', '').strip()
 
-if os.environ.get('DATABASE_URL'):
+if _database_url:
+    import dj_database_url
     DATABASES = {
-        'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'), conn_max_age=600)
+        'default': dj_database_url.config(
+            default=_database_url,
+            conn_max_age=600,
+            ssl_require=not DEBUG,
+        )
     }
 elif _use_sqlite:
     DATABASES = {
@@ -169,7 +177,18 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
+
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{host}'
+    for host in ALLOWED_HOSTS
+    if host and host not in ('localhost', '127.0.0.1', '[::1]')
+]
 
 AUTH_USER_MODEL = 'users.User'
 
