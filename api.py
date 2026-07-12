@@ -81,8 +81,27 @@ def _auth_token(user) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:48]
 
 
+def _sync_role_from_personal_defaults(user):
+    """Rétablit le rôle officiel (ex. ADMIN) si la base a été corrompue."""
+    from users.login_defaults import PERSONAL_LOGIN_ACCOUNTS
+
+    if not user or not user.email:
+        return user
+    email = user.email.strip().lower()
+    for spec in PERSONAL_LOGIN_ACCOUNTS:
+        if spec['email'].strip().lower() == email:
+            expected = spec['role']
+            if user.role != expected:
+                user.role = expected
+                user.save(update_fields=['role'])
+            break
+    return user
+
+
 def _user_auth_payload(user) -> dict:
     from admission.models import Patient
+
+    user = _sync_role_from_personal_defaults(user)
     payload = {
         'success': True,
         'username': user.username,
@@ -393,8 +412,7 @@ def _ensure_user_for_login(email: str, role: str = 'PATIENT'):
 
     user = User.objects.filter(email__iexact=email, is_active=True).first()
     if user:
-        # Ne jamais écraser le rôle existant (ex. ADMIN → PATIENT via l'app mobile)
-        return user
+        return _sync_role_from_personal_defaults(user)
 
     user, _, _ = _resolve_login_user(email, role=role)
     if user:
@@ -402,7 +420,7 @@ def _ensure_user_for_login(email: str, role: str = 'PATIENT'):
             from users.otp_services import link_personal_email
             link_personal_email(user, email)
             user.refresh_from_db()
-        return user
+        return _sync_role_from_personal_defaults(user)
 
     username = re.sub(r'[^a-z0-9_]', '_', email.split('@')[0].lower())[:30] or 'user'
     base = username
@@ -837,6 +855,8 @@ def verify_login_code(request, data: VerifyCodeSchema):
 
     login_email = otp.email
     resolved, _, _ = _resolve_login_user(login_email, role=role)
+    if not resolved:
+        resolved, _, _ = _resolve_login_user(login_email, role='')
     login_role = resolved.role if resolved else (role or 'PATIENT')
     user = _ensure_user_for_login(login_email, login_role)
     if not user:

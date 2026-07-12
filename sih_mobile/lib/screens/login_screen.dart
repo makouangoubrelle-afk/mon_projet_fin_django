@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _info;
   String? _debugCode;
   String _emailSent = '';
-  String _loginRole = 'PATIENT';
 
   @override
   void dispose() {
@@ -61,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
 
-      final res = await _auth.sendCode(email, role: _loginRole);
+      final res = await _auth.sendCode(email);
       if (res['success'] != true) {
         throw Exception(res['detail']?.toString() ?? 'Envoi impossible');
       }
@@ -91,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final res = await _auth.verifyCode(_emailSent, code, role: _loginRole);
+      final res = await _auth.verifyCode(_emailSent, code);
       if (res['success'] != true) {
         throw Exception(res['detail']?.toString() ?? 'Code refusé');
       }

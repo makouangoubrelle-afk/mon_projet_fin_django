@@ -55,6 +55,13 @@ def serve_mobile(request, path=''):
     mobile_dir = Path(settings.MOBILE_DIR)
     index = mobile_dir / 'index.html'
 
+    def _with_no_cache(response, target_name: str):
+        if target_name in ('index.html', 'flutter_bootstrap.js', 'flutter_service_worker.js') or target_name.endswith('.js'):
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response['Pragma'] = 'no-cache'
+            response['Expires'] = '0'
+        return response
+
     if not index.is_file():
         return HttpResponse(
             (
@@ -78,9 +85,11 @@ def serve_mobile(request, path=''):
             raise Http404() from exc
         if target.is_file():
             content_type, _ = mimetypes.guess_type(str(target))
-            return FileResponse(
+            response = FileResponse(
                 open(target, 'rb'),
                 content_type=content_type or 'application/octet-stream',
             )
+            return _with_no_cache(response, target.name)
 
-    return FileResponse(open(index, 'rb'), content_type='text/html')
+    response = FileResponse(open(index, 'rb'), content_type='text/html')
+    return _with_no_cache(response, 'index.html')
