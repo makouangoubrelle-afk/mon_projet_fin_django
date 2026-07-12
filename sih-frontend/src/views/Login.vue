@@ -146,7 +146,7 @@
           <div v-if="debugCode && !deliveryLive" class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-center">
             <p class="text-amber-200 text-xs uppercase tracking-wider mb-1">Votre code de connexion</p>
             <p class="text-3xl font-bold text-white tracking-[0.3em] select-all">{{ debugCode }}</p>
-            <p class="text-amber-200/80 text-xs mt-2">Copiez ce code ci-dessous ou saisissez-le dans le champ.</p>
+            <p class="text-amber-200/80 text-xs mt-2">Le code est déjà rempli ci-dessous. Cliquez sur « Valider et accéder ».</p>
           </div>
 
           <div>
@@ -164,14 +164,6 @@
               @input="onOtpSingleInput"
               @keydown.enter.prevent="verifyCode"
             />
-            <div class="flex justify-center gap-2 mt-3" aria-hidden="true">
-              <span
-                v-for="(_, i) in otpDigits"
-                :key="i"
-                class="w-9 h-11 rounded-lg border flex items-center justify-center text-lg font-bold transition"
-                :class="otpDigits[i] ? 'border-teal-500/50 bg-teal-500/10 text-white' : 'border-slate-700 bg-slate-800/50 text-slate-600'"
-              >{{ otpDigits[i] || '·' }}</span>
-            </div>
           </div>
 
           <button type="submit" :disabled="loading || verifying || otpCode.replace(/\D/g,'').length !== 6"
@@ -227,7 +219,6 @@ const otpMinutes = computed(() => authConfig.value.otp_validity_minutes || 5)
 const lookupInfo = ref({ found: false })
 const lookupLoading = ref(false)
 const otpCode = ref('')
-const otpDigits = ref(['', '', '', '', '', ''])
 const otpSingleRef = ref(null)
 const roleLabel = ref('')
 const debugCode = ref('')
@@ -263,19 +254,12 @@ function workflowStepClass(stepNum) {
   return 'bg-slate-800 border-slate-600 text-slate-400'
 }
 
-function syncDigitsFromCode() {
-  const digits = (otpCode.value || '').replace(/\D/g, '').slice(0, 6).split('')
-  otpDigits.value = [...digits, ...Array(6 - digits.length).fill('')].slice(0, 6)
-}
-
 function resetOtpDigits() {
   otpCode.value = ''
-  otpDigits.value = ['', '', '', '', '', '']
 }
 
 function onOtpSingleInput() {
   otpCode.value = (otpCode.value || '').replace(/\D/g, '').slice(0, 6)
-  syncDigitsFromCode()
   error.value = ''
 }
 
@@ -411,9 +395,10 @@ async function sendCode() {
       debugCode.value = res.delivery_live ? '' : (res.debug_code || '')
       info.value = res.delivery_live
         ? (res.detail || 'Code envoyé ! Consultez votre boîte mail.')
-        : (res.debug_code
-          ? `Code de test : ${res.debug_code} (configurez Gmail dans .env pour le vrai email).`
-          : (res.detail || 'Code généré.'))
+        : (res.debug_code ? '' : (res.detail || 'Code généré.'))
+      if (debugCode.value) {
+        otpCode.value = debugCode.value
+      }
       startCooldown(60)
       focusOtpInput()
     } else {
