@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card overflow-hidden flex flex-col" :class="embedded ? 'h-[520px]' : 'h-[600px]'">
+  <div class="page-card overflow-hidden flex flex-col h-[min(440px,62vh)] sm:h-[520px] lg:h-[600px]">
     <div class="p-4 border-b border-white/10 flex items-center justify-between gap-3 bg-gradient-to-r from-teal-500/10 to-cyan-500/5">
       <div>
         <h3 class="text-white font-bold flex items-center gap-2">

@@ -69,7 +69,7 @@
 
 
 
-    <div class="table-card">
+    <div class="table-card hidden md:block">
 
       <div class="overflow-x-auto">
 
@@ -201,9 +201,45 @@
 
 
 
+    <!-- Liste mobile (cartes) -->
+    <div v-if="!loading" class="md:hidden space-y-3">
+      <p v-if="!filteredPatients.length" class="text-slate-500 text-sm px-1">Aucun patient trouvé.</p>
+      <button
+        v-for="p in filteredPatients"
+        :key="`mobile-${p.id}`"
+        type="button"
+        class="page-card w-full p-4 text-left"
+        @click="openDossier(p)"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-white font-semibold truncate">{{ p.nom }} {{ p.prenom }}</p>
+            <p class="text-teal-400 text-xs font-mono mt-1">{{ p.numero_identite || p.sgl_id }}</p>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium shrink-0" :class="statutClass(p.statut)">
+            {{ p.statut_label || '—' }}
+          </span>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400">
+          <span>📱 {{ p.telephone || '—' }}</span>
+          <span>🎂 {{ p.age ?? '—' }} ans</span>
+          <span v-if="!isPatientView" class="col-span-2 truncate">✉️ {{ p.email || '—' }}</span>
+        </div>
+        <div v-if="!isPatientView" class="mt-3 flex flex-wrap gap-2" @click.stop>
+          <button type="button" class="text-xs px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-200" @click="selectChatPatient(p)">
+            💬 Chat
+          </button>
+          <button type="button" class="text-xs px-3 py-1.5 rounded-lg bg-white/5 text-slate-300" @click="showQr(p)">QR</button>
+          <button type="button" class="text-xs px-3 py-1.5 rounded-lg bg-white/5 text-slate-300" @click="showProduits(p)">Produits</button>
+        </div>
+      </button>
+    </div>
+
+
+
     <!-- Chat médical global -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div v-if="!isPatientView" class="page-card p-4 lg:col-span-1 flex flex-col max-h-[600px]">
+      <div v-if="!isPatientView" class="hidden lg:flex page-card p-4 lg:col-span-1 flex-col max-h-[600px]">
         <h3 class="text-white font-semibold mb-1 flex items-center gap-2">
           📥 Conversations patients
           <span v-if="totalChatUnread" class="text-xs px-2 py-0.5 rounded-full bg-red-500/30 text-red-200">{{ totalChatUnread }}</span>

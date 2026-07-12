@@ -3,8 +3,18 @@
     <router-view />
   </div>
   <div v-else class="flex min-h-screen bg-slate-950">
+    <div
+      v-if="sidebarOpen"
+      class="fixed inset-0 bg-black/70 z-40 lg:hidden"
+      aria-hidden="true"
+      @click="sidebarOpen = false"
+    />
+
     <!-- Sidebar -->
-    <aside class="w-72 fixed h-full z-50 flex flex-col app-sidebar border-r border-white/5">
+    <aside
+      class="w-[min(100vw-3rem,18rem)] lg:w-72 fixed h-full z-50 flex flex-col app-sidebar border-r border-white/5 transition-transform duration-300 ease-out lg:translate-x-0"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+    >
       <div class="p-6 border-b border-white/5">
         <div class="flex items-center gap-3">
           <div class="w-11 h-11 rounded-xl theme-accent-bg border theme-accent-border flex items-center justify-center text-xl">{{ appIcon }}</div>
@@ -20,7 +30,8 @@
           <p class="text-[10px] uppercase tracking-widest text-slate-600 px-3 mb-2">{{ section.title }}</p>
           <router-link v-for="link in section.links" :key="link.to" :to="link.to"
             class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-white/5 transition mb-0.5 nav-link"
-            active-class="nav-link-active">
+            active-class="nav-link-active"
+            @click="closeSidebarMobile">
             <span>{{ link.icon }}</span>
             <span>{{ link.label }}</span>
           </router-link>
@@ -40,22 +51,32 @@
     </aside>
 
     <!-- Main -->
-    <div class="flex-1 ml-72">
-      <header class="sticky top-0 z-40 px-8 py-4 bg-slate-950/80 backdrop-blur border-b border-white/5 flex items-center justify-between">
-        <div>
-          <h2 class="text-white font-semibold">{{ pageTitle }}</h2>
-          <p class="text-xs text-slate-500">{{ today }}</p>
+    <div class="flex-1 w-full min-w-0 lg:ml-72">
+      <header class="sticky top-0 z-30 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 bg-slate-950/95 backdrop-blur border-b border-white/5 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            class="lg:hidden shrink-0 w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-white text-lg"
+            aria-label="Ouvrir le menu"
+            @click="sidebarOpen = true"
+          >
+            ☰
+          </button>
+          <div class="min-w-0">
+            <h2 class="text-white font-semibold truncate">{{ pageTitle }}</h2>
+            <p class="text-xs text-slate-500 truncate">{{ today }}</p>
+          </div>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3 shrink-0">
           <NotificationBell v-if="!isPatientMode" />
-          <span class="status-pill text-xs">
+          <span class="status-pill text-xs hidden sm:inline-flex">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             Système opérationnel
           </span>
         </div>
       </header>
       <main
-        class="p-8 main-backdrop min-h-[calc(100vh-4rem)]"
+        class="p-4 sm:p-6 lg:p-8 main-backdrop min-h-[calc(100vh-4rem)]"
         :style="{ '--page-bg-image': `url('${pageBackground}')` }"
       >
         <PageFlowNav />
@@ -79,6 +100,7 @@ const route = useRoute()
 const router = useRouter()
 const user = ref(getUser())
 const patientSession = ref(getPatientSession())
+const sidebarOpen = ref(false)
 
 const PATIENT_MENU = [{
   title: 'Mon espace patient',
@@ -94,7 +116,14 @@ const PATIENT_MENU = [{
 router.afterEach(() => {
   user.value = getUser()
   patientSession.value = getPatientSession()
+  sidebarOpen.value = false
 })
+
+function closeSidebarMobile() {
+  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+    sidebarOpen.value = false
+  }
+}
 
 function refreshMenu() {
   user.value = getUser()

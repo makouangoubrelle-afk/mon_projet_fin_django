@@ -52,7 +52,28 @@ body {
 }
 
 .app-sidebar {
-  background: linear-gradient(180deg, var(--theme-sidebar), rgba(12, 18, 40, 0.96));
+  background: linear-gradient(180deg, #0f172a, #0b1220);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (max-width: 1023px) {
+  .main-backdrop {
+    background-attachment: scroll;
+  }
+
+  .app-sidebar {
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+  }
+
+  .table-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page-heading {
+    align-items: flex-start;
+  }
 }
 
 html[data-sghl-sidebar-glow="1"] .app-sidebar {
