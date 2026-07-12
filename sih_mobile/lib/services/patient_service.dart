@@ -8,4 +8,9 @@ class PatientService {
   Future<Map<String, dynamic>> fetchDossier(int patientId) {
     return _client.getJson('/reception/patients/$patientId/dossier');
   }
+
+  Future<Map<String, dynamic>> fetchMyDossier(String email) {
+    final q = Uri(queryParameters: {'email': email.trim()}).query;
+    return _client.getJson('/reception/mon-dossier?$q');
+  }
 }

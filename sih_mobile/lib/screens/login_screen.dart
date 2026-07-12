@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import 'staff_redirect_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.client});
@@ -25,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _info;
   String? _debugCode;
   String _emailSent = '';
+  String _loginRole = 'PATIENT';
 
   @override
   void dispose() {
@@ -47,7 +49,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final res = await _auth.sendCode(email);
+      final lookup = await _auth.lookup(email);
+      final roleLabel = lookup['role_label']?.toString() ?? '';
+      if (lookup['found'] == true &&
+          roleLabel.isNotEmpty &&
+          !roleLabel.toLowerCase().contains('patient')) {
+        setState(() {
+          _info =
+              'Compte $roleLabel détecté. Cette app est pour les patients — '
+              'vous serez redirigé vers l\'interface web après connexion.';
+        });
+      }
+
+      final res = await _auth.sendCode(email, role: _loginRole);
       if (res['success'] != true) {
         throw Exception(res['detail']?.toString() ?? 'Envoi impossible');
       }
@@ -77,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final res = await _auth.verifyCode(_emailSent, code);
+      final res = await _auth.verifyCode(_emailSent, code, role: _loginRole);
       if (res['success'] != true) {
         throw Exception(res['detail']?.toString() ?? 'Code refusé');
       }
@@ -90,13 +104,32 @@ class _LoginScreenState extends State<LoginScreen> {
         widget.client.patientId = int.tryParse('$patientId');
       }
 
+      final role = res['role']?.toString() ?? 'PATIENT';
+      final roleLabel = res['role_label']?.toString() ?? 'Patient';
+      final userEmail = res['email']?.toString() ?? _emailSent;
+
       if (!mounted) return;
+
+      if (role != 'PATIENT') {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => StaffRedirectScreen(
+              client: widget.client,
+              roleLabel: roleLabel,
+              email: userEmail,
+            ),
+          ),
+        );
+        return;
+      }
+
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => HomeScreen(
             client: widget.client,
-            userName: res['username']?.toString() ?? _emailSent,
-            roleLabel: res['role_label']?.toString() ?? 'Patient',
+            userName: res['username']?.toString() ?? userEmail,
+            roleLabel: roleLabel,
+            userEmail: userEmail,
           ),
         ),
       );
@@ -141,6 +174,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey.shade400),
                   ),
+                  if (!_codeStep)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Utilisez votre email patient (ex. patient@gmail.com)',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                      ),
+                    ),
                   const SizedBox(height: 32),
                   if (!_codeStep) ...[
                     TextField(
@@ -148,8 +190,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
                       decoration: const InputDecoration(
-                        labelText: 'Email',
-                        hintText: 'votre@email.com',
+                        labelText: 'Email patient',
+                        hintText: 'patient@gmail.com',
                         prefixIcon: Icon(Icons.mail_outline),
                       ),
                     ),

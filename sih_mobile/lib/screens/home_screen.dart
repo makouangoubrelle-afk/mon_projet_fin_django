@@ -10,11 +10,13 @@ class HomeScreen extends StatefulWidget {
     required this.client,
     required this.userName,
     required this.roleLabel,
+    required this.userEmail,
   });
 
   final ApiClient client;
   final String userName;
   final String roleLabel;
+  final String userEmail;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -34,22 +36,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
-    final id = widget.client.patientId;
-    if (id == null) {
-      setState(() {
-        _loading = false;
-        _error = 'Aucun dossier patient lié à ce compte.';
-      });
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
-      final data = await _patients.fetchDossier(id);
+      Map<String, dynamic> data;
+      final id = widget.client.patientId;
+      if (id != null) {
+        data = await _patients.fetchDossier(id);
+      } else {
+        data = await _patients.fetchMyDossier(widget.userEmail);
+        final profil = data['profil'] as Map<String, dynamic>?;
+        final pid = profil?['id'];
+        if (pid is int) {
+          widget.client.patientId = pid;
+        } else if (pid != null) {
+          widget.client.patientId = int.tryParse('$pid');
+        }
+      }
+
       final profil = data['profil'] as Map<String, dynamic>?;
       if (profil != null) {
         final nom = '${profil['nom'] ?? ''} ${profil['prenom'] ?? ''}'.trim();
@@ -57,7 +64,14 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       setState(() => _dossier = data);
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        if (_error!.contains('404') || _error!.toLowerCase().contains('aucun dossier')) {
+          _error =
+              'Aucun dossier patient lié à ${widget.userEmail}.\n'
+              'Demandez à l\'accueil de créer votre dossier ou utilisez patient@gmail.com pour tester.';
+        }
+      });
     } finally {
       setState(() => _loading = false);
     }
@@ -90,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
             if (_loading)
@@ -125,6 +140,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text('${widget.roleLabel} · ${widget.userName}'),
                       if (profil['telephone'] != null)
                         Text('Tél. ${profil['telephone']}'),
+                      if (profil['statut_label'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Chip(
+                            label: Text(profil['statut_label'].toString()),
+                            backgroundColor: const Color(0xFF14B8A6).withValues(alpha: 0.15),
+                          ),
+                        ),
                       if (profil['groupe_sanguin'] != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),

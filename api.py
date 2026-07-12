@@ -96,6 +96,11 @@ def _user_auth_payload(user) -> dict:
         'patient_id': None,
     }
     dossier = Patient.objects.filter(user=user).first()
+    if not dossier and user.email:
+        dossier = Patient.objects.filter(email__iexact=user.email).first()
+        if dossier and not dossier.user_id:
+            dossier.user = user
+            dossier.save(update_fields=['user'])
     if not dossier and user.role == 'PATIENT' and user.email:
         from admission.api import ensure_patient_portal, _resolve_patient_by_email
         dossier = _resolve_patient_by_email(user.email)
@@ -388,9 +393,7 @@ def _ensure_user_for_login(email: str, role: str = 'PATIENT'):
 
     user = User.objects.filter(email__iexact=email, is_active=True).first()
     if user:
-        if user.role != role:
-            user.role = role
-            user.save(update_fields=['role'])
+        # Ne jamais écraser le rôle existant (ex. ADMIN → PATIENT via l'app mobile)
         return user
 
     user, _, _ = _resolve_login_user(email, role=role)
@@ -399,9 +402,6 @@ def _ensure_user_for_login(email: str, role: str = 'PATIENT'):
             from users.otp_services import link_personal_email
             link_personal_email(user, email)
             user.refresh_from_db()
-        if user.role != role:
-            user.role = role
-            user.save(update_fields=['role'])
         return user
 
     username = re.sub(r'[^a-z0-9_]', '_', email.split('@')[0].lower())[:30] or 'user'
@@ -836,9 +836,11 @@ def verify_login_code(request, data: VerifyCodeSchema):
         }
 
     login_email = otp.email
-    user = _ensure_user_for_login(login_email, role or '')
+    resolved, _, _ = _resolve_login_user(login_email, role=role)
+    login_role = resolved.role if resolved else (role or 'PATIENT')
+    user = _ensure_user_for_login(login_email, login_role)
     if not user:
-        user = _ensure_user_for_login(data.email, role or '')
+        user = _ensure_user_for_login(data.email, login_role)
     if not user:
         return {
             'success': False,
