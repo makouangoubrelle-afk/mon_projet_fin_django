@@ -1206,3 +1206,19 @@ def chat_unread_count(request, patient_id: int = None):
         patient=own, lu_par_patient=False,
     ).exclude(sender_role='PATIENT').count()
     return {'count': c, 'role': 'patient', 'patient_id': own.id}
+
+
+@admission_router.delete('/chat/conversation', tags=['Chat médical'])
+def supprimer_conversation_chat(request, patient_id: int):
+    from ninja.errors import HttpError
+
+    user, patient = _require_chat_access(request, patient_id)
+    deleted, _ = PatientChatMessage.objects.filter(patient=patient).delete()
+    if deleted == 0:
+        raise HttpError(404, 'Aucune conversation à supprimer.')
+    return {
+        'success': True,
+        'deleted': deleted,
+        'patient_id': patient.id,
+        'detail': 'Conversation supprimée.',
+    }

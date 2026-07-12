@@ -256,6 +256,8 @@ export const chatService = {
     const q = patientId ? `?patient_id=${patientId}` : ''
     return apiCall(`/reception/chat/unread-count${q}`)
   },
+  deleteConversation: (patientId) =>
+    apiCall(`/reception/chat/conversation?patient_id=${patientId}`, { method: 'DELETE' }),
 }
 
 export const ordonnanceService = {

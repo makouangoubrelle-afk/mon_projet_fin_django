@@ -10,9 +10,18 @@
           {{ isStaff ? `Conversation — ${patientLabel}` : 'Contactez l\'équipe médicale et demandez un rendez-vous' }}
         </p>
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap justify-end">
         <button type="button" class="text-xs px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 hover:bg-white/10" @click="loadMessages">
           ↻ Actualiser
+        </button>
+        <button
+          v-if="messages.length"
+          type="button"
+          class="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/30"
+          :disabled="deleting"
+          @click="deleteConversation"
+        >
+          {{ deleting ? '…' : '🗑 Supprimer' }}
         </button>
         <button
           type="button"
@@ -104,7 +113,7 @@ const props = defineProps({
   embedded: { type: Boolean, default: true },
 })
 
-const emit = defineEmits(['message-sent'])
+const emit = defineEmits(['message-sent', 'conversation-deleted'])
 
 const STAFF_ROLES = ['ADMIN', 'MEDECIN', 'INFIRMIER', 'SECRETAIRE', 'SECRETAIRE_GENERALE', 'RECEPTIONNISTE']
 
@@ -117,6 +126,7 @@ const isStaff = computed(() => {
 const messages = ref([])
 const loading = ref(false)
 const sending = ref(false)
+const deleting = ref(false)
 const draft = ref('')
 const chatError = ref('')
 const mode = ref('chat')
@@ -210,6 +220,25 @@ async function sendMessage() {
     chatError.value = e.message
   } finally {
     sending.value = false
+  }
+}
+
+async function deleteConversation() {
+  if (!props.patientId || !messages.value.length) return
+  const label = isStaff.value ? patientLabel.value : 'cette conversation'
+  if (!window.confirm(`Supprimer toute la conversation avec ${label} ? Cette action est irréversible.`)) return
+  deleting.value = true
+  chatError.value = ''
+  try {
+    await chatService.deleteConversation(props.patientId)
+    messages.value = []
+    unreadCount.value = 0
+    emit('conversation-deleted')
+    emit('message-sent')
+  } catch (e) {
+    chatError.value = e.message
+  } finally {
+    deleting.value = false
   }
 }
 

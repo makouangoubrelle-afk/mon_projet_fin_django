@@ -272,6 +272,7 @@
           :patient-id="activeChatPatientId"
           :patient-nom="activeChatPatientNom"
           @message-sent="loadChatInbox"
+          @conversation-deleted="onChatConversationDeleted"
         />
       </div>
     </div>
@@ -1003,6 +1004,13 @@ async function loadChatInbox() {
     chatUnread.value = unread
   } catch (e) {
     console.warn('[Patients] chat inbox:', e.message)
+  }
+}
+
+function onChatConversationDeleted() {
+  loadChatInbox()
+  if (!isPatientView.value) {
+    selectedChatPatient.value = null
   }
 }
 
