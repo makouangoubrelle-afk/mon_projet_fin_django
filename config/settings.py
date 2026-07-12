@@ -44,6 +44,7 @@ ALLOWED_HOSTS = [
 ]
 
 FRONTEND_DIR = BASE_DIR / 'frontend_dist'
+MOBILE_DIR = BASE_DIR / 'mobile_dist'
 
 
 # Application definition

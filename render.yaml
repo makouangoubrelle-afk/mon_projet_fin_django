@@ -5,10 +5,7 @@ services:
     plan: free
     region: oregon
     buildCommand: |
-      pip install -r requirements.txt
-      cd sih-frontend && npm install && npm run build && cd ..
-      python manage.py migrate --noinput
-      python manage.py collectstatic --noinput
+      bash build.sh
       python manage.py seed_personal_logins || true
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
