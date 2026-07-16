@@ -244,6 +244,7 @@ export const patientService = {
   assurances: () => apiCall('/reception/assurances'),
   create: (data) => apiCall('/reception/patients', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiCall(`/reception/patients/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  delete: (id) => apiCall(`/reception/patients/${id}`, { method: 'DELETE' }),
   syncPortail: () => apiCall('/reception/patients/sync-portail', { method: 'POST' }),
 }
 
@@ -258,6 +259,8 @@ export const chatService = {
   },
   deleteConversation: (patientId) =>
     apiCall(`/reception/chat/conversation?patient_id=${patientId}`, { method: 'DELETE' }),
+  deleteMessage: (messageId) =>
+    apiCall(`/reception/chat/messages/${messageId}`, { method: 'DELETE' }),
 }
 
 export const ordonnanceService = {

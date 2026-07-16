@@ -701,6 +701,8 @@ const patientMenu = [
 
   { key: 'chat', icon: '💬', label: 'Ouvrir le chat' },
 
+  { key: 'supprimer', icon: '🗑', label: 'Supprimer le patient', danger: true },
+
 ]
 
 const groupesSanguins = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
@@ -823,11 +825,23 @@ async function onPatientAction(key, p) {
       await showProduits(p)
     } else if (key === 'chat') {
       selectChatPatient(p)
+    } else if (key === 'supprimer') {
+      await deletePatient(p)
     }
   } catch (e) {
     console.error('[Patients] action', key, e)
     alert(`Action impossible : ${e.message}`)
   }
+}
+
+async function deletePatient(p) {
+  if (!p?.id) return
+  const nom = `${p.nom || ''} ${p.prenom || ''}`.trim() || 'ce patient'
+  if (!window.confirm(`Supprimer définitivement ${nom} ?\n\nToutes ses données (dossier, RDV, messages…) seront effacées. Cette action est irréversible.`)) return
+  await patientService.delete(p.id)
+  if (selectedChatPatient.value?.id === p.id) selectedChatPatient.value = null
+  await load()
+  if (!isPatientView.value) loadChatInbox()
 }
 
 

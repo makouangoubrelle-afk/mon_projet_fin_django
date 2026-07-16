@@ -19,9 +19,10 @@
           type="button"
           class="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/30"
           :disabled="deleting"
+          title="Supprimer toute la conversation"
           @click="deleteConversation"
         >
-          {{ deleting ? '…' : '🗑 Supprimer' }}
+          {{ deleting ? '…' : '🗑 Conversation' }}
         </button>
         <button
           type="button"
@@ -53,17 +54,27 @@
         <div
           v-for="m in messages"
           :key="m.id"
-          class="flex"
+          class="flex group"
           :class="m.is_mine ? 'justify-end' : 'justify-start'"
         >
           <div
-            class="max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-lg"
+            class="max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-lg relative"
             :class="bubbleClass(m)"
           >
             <div class="flex items-center gap-2 mb-1 flex-wrap">
               <span class="font-semibold text-xs">{{ m.sender_name }}</span>
               <span class="text-[10px] opacity-70">{{ roleLabel(m.sender_role) }}</span>
               <span v-if="m.message_type === 'RDV_DEMANDE'" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/30">RDV</span>
+              <button
+                v-if="canDeleteMessage(m)"
+                type="button"
+                class="ml-auto text-[10px] px-1.5 py-0.5 rounded opacity-70 hover:opacity-100 hover:bg-red-500/30 text-red-300"
+                title="Supprimer ce message"
+                :disabled="deletingMessageId === m.id"
+                @click.stop="deleteMessage(m)"
+              >
+                {{ deletingMessageId === m.id ? '…' : '🗑' }}
+              </button>
             </div>
             <p class="whitespace-pre-wrap leading-relaxed">{{ m.contenu }}</p>
             <p class="text-[10px] opacity-60 mt-2 text-right">{{ formatTime(m.created_at) }}</p>
@@ -127,6 +138,7 @@ const messages = ref([])
 const loading = ref(false)
 const sending = ref(false)
 const deleting = ref(false)
+const deletingMessageId = ref(null)
 const draft = ref('')
 const chatError = ref('')
 const mode = ref('chat')
@@ -220,6 +232,26 @@ async function sendMessage() {
     chatError.value = e.message
   } finally {
     sending.value = false
+  }
+}
+
+function canDeleteMessage(m) {
+  return Boolean(m?.is_mine) || isStaff.value
+}
+
+async function deleteMessage(m) {
+  if (!m?.id || !canDeleteMessage(m)) return
+  if (!window.confirm('Supprimer ce message ?')) return
+  deletingMessageId.value = m.id
+  chatError.value = ''
+  try {
+    await chatService.deleteMessage(m.id)
+    messages.value = messages.value.filter((x) => x.id !== m.id)
+    emit('message-sent')
+  } catch (e) {
+    chatError.value = e.message
+  } finally {
+    deletingMessageId.value = null
   }
 }
 

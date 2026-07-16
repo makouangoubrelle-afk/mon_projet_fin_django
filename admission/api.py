@@ -433,6 +433,29 @@ def modifier_patient(request, patient_id: int, data: PatientUpdateSchema):
     return _patient_out(patient)
 
 
+@admission_router.delete("/patients/{patient_id}", tags=["Réception & Enregistrement Malades"])
+def supprimer_patient(request, patient_id: int):
+    from ninja.errors import HttpError
+    from config.auth_helpers import get_api_user
+
+    user = get_api_user(request)
+    allowed = {'ADMIN', 'SECRETAIRE_GENERALE', 'SECRETAIRE', 'RECEPTIONNISTE'}
+    if not user or user.role not in allowed:
+        raise HttpError(403, "Vous n'avez pas les droits pour supprimer un patient.")
+
+    patient = get_object_or_404(Patient, id=patient_id)
+    label = f'{patient.sgl_id} — {patient.nom} {patient.prenom}'
+    linked_user = patient.user
+
+    patient.delete()
+    if linked_user and linked_user.role == 'PATIENT':
+        linked_user.delete()
+
+    from core.services import log_activity
+    log_activity(request, 'Suppression dossier patient', 'Patients', label)
+    return {'success': True, 'detail': 'Patient supprimé.', 'patient_id': patient_id}
+
+
 @admission_router.get("/patients/{patient_id}/produits", tags=["Réception & Enregistrement Malades"])
 def produits_patient(request, patient_id: int):
     from pharmacy.models import PrescriptionPharmacie
@@ -1222,3 +1245,18 @@ def supprimer_conversation_chat(request, patient_id: int):
         'patient_id': patient.id,
         'detail': 'Conversation supprimée.',
     }
+
+
+@admission_router.delete('/chat/messages/{message_id}', tags=['Chat médical'])
+def supprimer_message_chat(request, message_id: int):
+    from ninja.errors import HttpError
+
+    msg = get_object_or_404(PatientChatMessage, id=message_id)
+    user, _patient = _require_chat_access(request, msg.patient_id)
+
+    is_owner = (msg.sender_email or '').lower() == (user.email or '').lower()
+    if user.role not in STAFF_CHAT_ROLES and not is_owner:
+        raise HttpError(403, 'Vous ne pouvez supprimer que vos propres messages.')
+
+    msg.delete()
+    return {'success': True, 'deleted': 1, 'message_id': message_id, 'detail': 'Message supprimé.'}
